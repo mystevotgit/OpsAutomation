@@ -1,0 +1,132 @@
+{
+  "name": "AI Production Operations Copilot - Scheduled Alert Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "7e9df163-2697-425c-8590-1f2ebd729ff3",
+      "name": "Every 15 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "notes": "Runs every 15 minutes by default. Change this schedule after import if you want faster/slower demo alerts."
+    },
+    {
+      "parameters": {
+        "jsCode": "// AI Production Operations Copilot - Scheduled Alert Generator\n//\n// UPDATE THESE TWO VALUES AFTER IMPORTING:\n// 1. targetWebhookUrl: the production webhook URL for the main Alert Triage workflow.\n// 2. approvalBaseUrl: the production webhook URL for the Approval Handler workflow.\n//\n// For local testing, you can use webhook-test URLs only while manually executing workflows.\n\nconst config = {\n  targetWebhookUrl: 'https://oyeolatunji.app.n8n.cloud/webhook/ops-copilot-alert',\n  approvalBaseUrl: 'https://oyeolatunji.app.n8n.cloud/webhook/ops-copilot-approval',\n  source: 'scheduled-demo-generator',\n  environment: 'prod'\n};\n\nconst staticData = $getWorkflowStaticData('global');\nstaticData.runCount = (staticData.runCount || 0) + 1;\n\nconst now = new Date();\nconst timestamp = now.toISOString();\nconst suffix = `${now.toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)}-${staticData.runCount}`;\n\nconst scenarios = [\n  {\n    title: 'High latency and error rate on booking-transformer',\n    service: 'booking-transformer',\n    severity: 'critical',\n    description: 'P95 latency and 5xx rate exceeded threshold after recent deployment',\n    metrics: {\n      p95LatencyMs: 2400,\n      p99LatencyMs: 5100,\n      errorRatePercent: 12.5,\n      throughputRps: 460,\n      saturationPercent: 91\n    },\n    logs: [\n      'ERROR timeout calling downstream inventory-api after 2000ms',\n      'WARN retry attempt=3 correlationId=demo-123',\n      'ERROR circuit breaker open for dependency=inventory-api'\n    ]\n  },\n  {\n    title: 'Kafka consumer lag increasing on payment-events-consumer',\n    service: 'payment-events-consumer',\n    severity: 'high',\n    description: 'Consumer lag is growing faster than processing throughput, creating delayed payment status updates',\n    metrics: {\n      p95LatencyMs: 850,\n      p99LatencyMs: 1700,\n      errorRatePercent: 3.8,\n      throughputRps: 220,\n      saturationPercent: 84,\n      kafkaConsumerLag: 18500\n    },\n    logs: [\n      'WARN consumer lag above threshold topic=payment-events partition=4 lag=18500',\n      'ERROR failed to deserialize event schemaVersion=7 expected=6',\n      'WARN retrying message offset=827193 attempt=2'\n    ]\n  },\n  {\n    title: 'Database connection pool saturation on customer-profile-api',\n    service: 'customer-profile-api',\n    severity: 'high',\n    description: 'Database pool utilization is near max and API latency is degrading for customer profile lookups',\n    metrics: {\n      p95LatencyMs: 1900,\n      p99LatencyMs: 4200,\n      errorRatePercent: 7.2,\n      throughputRps: 310,\n      saturationPercent: 96,\n      dbPoolUtilizationPercent: 98\n    },\n    logs: [\n      'WARN HikariPool connection wait timeout after 30000ms',\n      'ERROR SQLTransientConnectionException connection is not available',\n      'WARN slow query detected durationMs=2840 table=customer_profile'\n    ]\n  },\n  {\n    title: 'Payment provider timeout spike on checkout-service',\n    service: 'checkout-service',\n    severity: 'medium',\n    description: 'External payment provider calls are timing out intermittently, increasing checkout failure rate',\n    metrics: {\n      p95LatencyMs: 3100,\n      p99LatencyMs: 7600,\n      errorRatePercent: 5.6,\n      throughputRps: 145,\n      saturationPercent: 72,\n      externalDependencyTimeouts: 94\n    },\n    logs: [\n      'ERROR provider=payment-gateway request timed out after 5000ms',\n      'WARN fallback payment status set to PENDING correlationId=pay-9921',\n      'WARN circuit breaker half-open for payment-gateway'\n    ]\n  },\n  {\n    title: 'Memory pressure and pod restarts on recommendation-service',\n    service: 'recommendation-service',\n    severity: 'medium',\n    description: 'Container memory usage is close to limit and Kubernetes has restarted pods multiple times',\n    metrics: {\n      p95LatencyMs: 1200,\n      p99LatencyMs: 2800,\n      errorRatePercent: 2.9,\n      throughputRps: 380,\n      saturationPercent: 89,\n      memoryUsagePercent: 94,\n      podRestartCount: 3\n    },\n    logs: [\n      'WARN JVM heap usage above 90 percent',\n      'ERROR pod restarted reason=OOMKilled previousExitCode=137',\n      'WARN GC pause durationMs=740'\n    ]\n  }\n];\n\nconst scenario = scenarios[(staticData.runCount - 1) % scenarios.length];\n\nconst payload = {\n  incidentId: `inc-demo-${suffix}`,\n  source: config.source,\n  title: scenario.title,\n  service: scenario.service,\n  environment: config.environment,\n  severity: scenario.severity,\n  description: scenario.description,\n  metrics: scenario.metrics,\n  logs: scenario.logs,\n  approvalBaseUrl: config.approvalBaseUrl,\n  demoMetadata: {\n    generatedAt: timestamp,\n    scheduleRunCount: staticData.runCount,\n    scenarioNumber: ((staticData.runCount - 1) % scenarios.length) + 1,\n    workflowPurpose: 'Scheduled demo trigger for AI Production Operations Copilot'\n  }\n};\n\nreturn [\n  {\n    json: {\n      targetWebhookUrl: config.targetWebhookUrl,\n      payload\n    }\n  }\n];"
+      },
+      "id": "f7602f88-4862-4d43-84ab-42d98709f02d",
+      "name": "Build Variable Incident Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        272,
+        0
+      ],
+      "notes": "Edit config.targetWebhookUrl and config.approvalBaseUrl in this node after import. It rotates through several realistic production incident scenarios."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.targetWebhookUrl }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "78970b13-7ad6-4c95-b6d9-0d45383bc244",
+      "name": "POST Alert To Copilot Webhook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        544,
+        0
+      ],
+      "notes": "Calls the start webhook in the main Alert Triage workflow. Uses neverError so the next node can still summarize failures."
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\n\nreturn [\n  {\n    json: {\n      status: 'scheduled-alert-generator-finished',\n      httpStatusCode: response.statusCode || response.status || 'unknown',\n      copilotResponse: response.body || response,\n      checkedAt: new Date().toISOString(),\n      note: 'If this failed, confirm the main Alert Triage workflow is active and targetWebhookUrl points to /webhook/ops-copilot-alert, not /webhook-test unless testing manually.'\n    }\n  }\n];"
+      },
+      "id": "03deba31-0c7d-45d0-a5d7-a9badc01bafa",
+      "name": "Summarize Webhook Call Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        832,
+        0
+      ],
+      "notes": "Creates a clean execution output so you can confirm whether the scheduled job successfully called the main workflow."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every 15 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Build Variable Incident Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Variable Incident Payload": {
+      "main": [
+        [
+          {
+            "node": "POST Alert To Copilot Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST Alert To Copilot Webhook": {
+      "main": [
+        [
+          {
+            "node": "Summarize Webhook Call Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "aOhrJ1gMZWKruqWX",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "07e7eb2e-c3a8-4e01-853c-ba2c60cefb43",
+  "meta": {
+    "instanceId": "70fea89d10d5a2d3a8d1b2f6d1653827bccb2e579f48fb803f8e3a19d35129f4"
+  },
+  "id": "xyYNJyVDebMNmPEv",
+  "tags": []
+}

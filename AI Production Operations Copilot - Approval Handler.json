@@ -1,0 +1,209 @@
+{
+  "name": "AI Production Operations Copilot - Approval Handler",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "ops-copilot-approval",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "8082f1f3-3ef5-4d8e-bc4c-dbaf93d92a92",
+      "name": "Webhook - Approval Action",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -736,
+        112
+      ],
+      "webhookId": "667686ff-f3e4-40b4-b153-b9970aa3a7af"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst q = $json.query ?? $json;\nconst action = q.action ?? \"unknown\";\nconst incidentId = q.incidentId ?? \"unknown-incident\";\nconst service = q.service ?? \"unknown-service\";\n\nconst approved = [\"approve_rollback\", \"approve_retry\"].includes(action);\nconst operation = action === \"approve_rollback\" ? \"rollback\" : action === \"approve_retry\" ? \"retry\" : \"none\";\n\nreturn [{\n  json: {\n    incidentId,\n    service,\n    action,\n    approved,\n    operation,\n    requestedAt: new Date().toISOString(),\n    note: \"This demo does NOT execute real rollback/retry. Replace the simulation node with a secured deployment API call after adding authorization checks.\"\n  }\n}];\n"
+      },
+      "id": "56847247-6630-48e4-bb19-a65c5a9629c0",
+      "name": "Validate Approval Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -496,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.approved}}",
+              "value2": true
+            }
+          ],
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "8eb961c9-a892-4244-8ec5-eb001592c322",
+      "name": "IF - Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -256,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst x = $json;\nreturn [{\n  json: {\n    ...x,\n    executionStatus: \"simulated\",\n    message: `SIMULATED ${x.operation.toUpperCase()} for ${x.service} on incident ${x.incidentId}`,\n    completedAt: new Date().toISOString()\n  }\n}];\n"
+      },
+      "id": "783fe101-43b5-46e1-a2ad-395e4f2046b1",
+      "name": "Simulate Rollback or Retry",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nreturn [{\n  json: {\n    ...$json,\n    executionStatus: \"rejected\",\n    message: `No operational action executed for incident ${$json.incidentId}.`,\n    completedAt: new Date().toISOString()\n  }\n}];\n"
+      },
+      "id": "d8037eb8-32a7-4e30-a9eb-6ca9e0b75041",
+      "name": "Record Rejection",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst globalData = $getWorkflowStaticData('global');\nglobalData.approvalActions = globalData.approvalActions || [];\nglobalData.approvalActions.push($json);\nglobalData.approvalActions = globalData.approvalActions.slice(-100);\nreturn [{ json: { ...$json, storedApprovalActions: globalData.approvalActions.length } }];\n"
+      },
+      "id": "3ebc7ab3-3fad-4128-b68b-fbb3d33585cc",
+      "name": "Store Approval Result - Static Data Demo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{$json}}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "8dedfb00-7a9d-4eb0-8bbf-dbcd137246cc",
+      "name": "Respond - Approval Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        112
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Approval Action": {
+      "main": [
+        [
+          {
+            "node": "Validate Approval Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Approval Request": {
+      "main": [
+        [
+          {
+            "node": "IF - Approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Approved?": {
+      "main": [
+        [
+          {
+            "node": "Simulate Rollback or Retry",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Rejection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simulate Rollback or Retry": {
+      "main": [
+        [
+          {
+            "node": "Store Approval Result - Static Data Demo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Rejection": {
+      "main": [
+        [
+          {
+            "node": "Store Approval Result - Static Data Demo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Approval Result - Static Data Demo": {
+      "main": [
+        [
+          {
+            "node": "Respond - Approval Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "aOhrJ1gMZWKruqWX",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "2d2d841d-f190-4c16-a84d-9454ffe421ef",
+  "meta": {
+    "instanceId": "70fea89d10d5a2d3a8d1b2f6d1653827bccb2e579f48fb803f8e3a19d35129f4"
+  },
+  "id": "OH4lqxwaeWOSewfx",
+  "tags": []
+}

@@ -1,0 +1,830 @@
+{
+  "name": "AI Production Operations Copilot - Alert Triage",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ops-copilot-alert",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "63e26377-fd49-4169-b250-996275002408",
+      "name": "Webhook - Alert Intake",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        288,
+        1564
+      ],
+      "webhookId": "967617f8-3cb7-42cc-acb0-091bc9a2b3c3"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst body = $json.body ?? $json;\nconst labels = body.labels ?? {};\nconst now = new Date().toISOString();\n\nconst service = body.service ?? labels.service ?? labels.app ?? 'unknown-service';\nconst environment = body.environment ?? labels.environment ?? labels.env ?? 'unknown-env';\nconst severity = (body.severity ?? labels.severity ?? body.priority ?? 'warning').toLowerCase();\n\nconst alert = {\n  incidentId: body.incidentId ?? body.alertId ?? body.fingerprint ?? `inc-${Date.now()}`,\n  receivedAt: now,\n  source: body.source ?? 'webhook',\n  title: body.title ?? body.alertname ?? labels.alertname ?? 'Production alert received',\n  service,\n  environment,\n  severity,\n  status: body.status ?? 'firing',\n  description: body.description ?? body.message ?? body.annotations?.description ?? '',\n  runbookUrl: body.runbookUrl ?? body.annotations?.runbook_url ?? '',\n  raw: body\n};\n\nreturn [{ json: alert }];\n"
+      },
+      "id": "70c6b7e5-6cca-436f-9399-f27e8136c3b2",
+      "name": "Normalize Alert Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        512,
+        1564
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst alert = $json;\n\n// Demo enrichment so the workflow works without Prometheus, Grafana, Loki, or Datadog.\n// Replace this Code node with HTTP Request nodes when you connect real systems.\nconst serviceCatalog = {\n  \"payment-service\": {\n    owner: \"payments-platform\",\n    tier: \"tier-1\",\n    rollbackEndpoint: \"https://example.com/rollback/payment-service\",\n    retryEndpoint: \"https://example.com/retry/payment-service\"\n  },\n  \"booking-transformer\": {\n    owner: \"platform-modernization\",\n    tier: \"tier-1\",\n    rollbackEndpoint: \"https://example.com/rollback/booking-transformer\",\n    retryEndpoint: \"https://example.com/retry/booking-transformer\"\n  }\n};\n\nconst catalog = serviceCatalog[alert.service] ?? {\n  owner: \"unknown-owner\",\n  tier: \"tier-2\",\n  rollbackEndpoint: \"https://example.com/rollback/replace-me\",\n  retryEndpoint: \"https://example.com/retry/replace-me\"\n};\n\nconst metrics = {\n  p95LatencyMs: alert.raw?.metrics?.p95LatencyMs ?? 1850,\n  p99LatencyMs: alert.raw?.metrics?.p99LatencyMs ?? 3100,\n  errorRatePercent: alert.raw?.metrics?.errorRatePercent ?? 8.4,\n  throughputRps: alert.raw?.metrics?.throughputRps ?? 420,\n  saturationPercent: alert.raw?.metrics?.saturationPercent ?? 86\n};\n\nconst recentLogs = alert.raw?.logs ?? [\n  \"ERROR timeout calling downstream inventory-api after 2000ms\",\n  \"WARN retry attempt=3 correlationId=demo-123\",\n  \"ERROR circuit breaker open for dependency=inventory-api\"\n];\n\nconst runbooks = [\n  {\n    title: \"High API latency runbook\",\n    content: \"Check downstream dependency latency, recent deployments, circuit breaker state, saturation, and retry storms. Prefer rollback if error rate increased immediately after deployment.\"\n  },\n  {\n    title: \"Kafka consumer lag runbook\",\n    content: \"Check consumer lag, partition skew, poison messages, DLQ count, and downstream write latency. Prefer retry only when idempotency key exists.\"\n  },\n  {\n    title: \"Safe rollback policy\",\n    content: \"Rollback requires human approval for tier-1 services. Never execute rollback directly from AI output. The AI may recommend rollback, but an engineer must approve.\"\n  }\n];\n\nreturn [{\n  json: {\n    ...alert,\n    owner: catalog.owner,\n    tier: catalog.tier,\n    rollbackEndpoint: catalog.rollbackEndpoint,\n    retryEndpoint: catalog.retryEndpoint,\n    metrics,\n    recentLogs,\n    runbooks\n  }\n}];\n"
+      },
+      "id": "1096946b-ef1a-4735-b75e-11a2851a23bb",
+      "name": "Mock Enrichment - Metrics Logs Runbooks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        736,
+        1564
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst incident = $json;\n\nconst prompt = `\nYou are an AI Production Operations Copilot for a senior backend engineering team.\n\nAnalyze this production incident and return ONLY valid JSON with the exact fields below:\n{\n  \"severity\": \"critical|high|medium|low\",\n  \"businessImpact\": \"short plain-English impact summary\",\n  \"probableRootCause\": \"likely cause based on metrics/logs/runbooks\",\n  \"recommendedAction\": \"rollback|retry|investigate|ignore\",\n  \"confidence\": 0.0,\n  \"reasoningSummary\": [\"bullet 1\", \"bullet 2\", \"bullet 3\"],\n  \"customerMessage\": \"short internal stakeholder update\",\n  \"engineerNextSteps\": [\"step 1\", \"step 2\", \"step 3\"],\n  \"jiraSummary\": \"short Jira issue title\",\n  \"jiraDescription\": \"detailed Jira body\"\n}\n\nRules:\n- Do not execute rollback or retry.\n- If confidence is below 0.75, recommend investigate.\n- If tier-1 and error rate is high after a recent deploy, rollback may be recommended but must require approval.\n- Be concise and operationally useful.\n\nIncident:\n${JSON.stringify(incident, null, 2)}\n`;\n\nreturn [{ json: { ...incident, aiPrompt: prompt } }];\n"
+      },
+      "id": "acecfa03-9ce2-469e-bb11-eb20066d3f5a",
+      "name": "Build AI Triage Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        1564
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.OPENAI_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4o-mini\",\n  \"temperature\": 0.2,\n  \"response_format\": { \"type\": \"json_object\" },\n  \"messages\": [\n    { \"role\": \"system\", \"content\": \"You are a precise production operations copilot. Return valid JSON only.\" },\n    { \"role\": \"user\", \"content\": {{ JSON.stringify($json.aiPrompt) }} }\n  ]\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "631f8f37-582a-4ed6-a264-edac05f8b612",
+      "name": "OpenAI - Summarize Incident",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1184,
+        1564
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// The HTTP Request node returns the OpenAI response. Keep a defensive fallback\n// so the demo continues even if the API key is not configured.\nlet triage;\ntry {\n  const content = $json.choices?.[0]?.message?.content;\n  triage = JSON.parse(content);\n} catch (e) {\n  triage = {\n    severity: \"medium\",\n    businessImpact: \"Unable to call AI model. Manual triage required.\",\n    probableRootCause: \"AI response unavailable or invalid.\",\n    recommendedAction: \"investigate\",\n    confidence: 0.3,\n    reasoningSummary: [\"OpenAI call failed or response was not parseable.\"],\n    customerMessage: \"An alert was received and requires manual review.\",\n    engineerNextSteps: [\"Check n8n execution logs.\", \"Verify OPENAI_API_KEY.\", \"Review alert payload manually.\"],\n    jiraSummary: \"Production alert requires manual triage\",\n    jiraDescription: \"The AI triage step failed or returned invalid JSON.\"\n  };\n}\n\nconst original = $('Build AI Triage Prompt').first().json;\nconst needsApproval = [\"critical\", \"high\"].includes(triage.severity) || [\"rollback\", \"retry\"].includes(triage.recommendedAction);\n\nconst approvalBaseUrl = original.raw?.approvalBaseUrl ?? \"https://YOUR_N8N_DOMAIN/webhook/ops-copilot-approval\";\nconst approvalLinks = {\n  approveRollback: `${approvalBaseUrl}?incidentId=${encodeURIComponent(original.incidentId)}&action=approve_rollback&service=${encodeURIComponent(original.service)}`,\n  approveRetry: `${approvalBaseUrl}?incidentId=${encodeURIComponent(original.incidentId)}&action=approve_retry&service=${encodeURIComponent(original.service)}`,\n  reject: `${approvalBaseUrl}?incidentId=${encodeURIComponent(original.incidentId)}&action=reject&service=${encodeURIComponent(original.service)}`\n};\n\nreturn [{\n  json: {\n    ...original,\n    triage,\n    needsApproval,\n    approvalLinks,\n    createdAt: new Date().toISOString()\n  }\n}];\n"
+      },
+      "id": "6d121ea1-e03e-4935-8ed1-d2a933389e76",
+      "name": "Parse AI Triage + Approval Links",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1408,
+        1564
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst x = $json;\nconst safe = (value, fallback = \"N/A\") => value ?? fallback;\n\nconst formatList = (items = []) => {\n  if (!Array.isArray(items) || items.length === 0) {\n    return \"• No next steps provided.\";\n  }\n\n  return items.map((step) => `• ${step}`).join(\"\\n\");\n};\n\nconst approvalSection = x.needsApproval\n  ? [\n      `*Approval Required:*`,\n      `• <${x.approvalLinks.approveRollback}|Approve rollback>`,\n      `• <${x.approvalLinks.approveRetry}|Approve retry>`,\n      `• <${x.approvalLinks.reject}|Reject recommendation>`\n    ].join(\"\\n\")\n  : `*Approval:* No approval required.`;\n\nconst slackText = [\n  `🚨 *AI Production Operations Copilot*`,\n  ``,\n  `*Incident Summary*`,\n  `• *Incident ID:* \\`${safe(x.incidentId)}\\``,\n  `• *Service:* \\`${safe(x.service)}\\``,\n  `• *Environment:* \\`${safe(x.environment)}\\``,\n  `• *Severity:* *${safe(x.triage?.severity).toUpperCase()}*`,\n  `• *Confidence:* ${safe(x.triage?.confidence)}`,\n  ``,\n  `*Impact*`,\n  `${safe(x.triage?.businessImpact)}`,\n  ``,\n  `*Likely Root Cause*`,\n  `${safe(x.triage?.probableRootCause)}`,\n  ``,\n  `*Recommended Action*`,\n  `${safe(x.triage?.recommendedAction)}`,\n  ``,\n  `*Engineer Next Steps*`,\n  formatList(x.triage?.engineerNextSteps),\n  ``,\n  approvalSection\n].join(\"\\n\");\n\nconst jiraText = [\n  `${safe(x.triage?.jiraDescription)}`,\n  ``,\n  `*Incident Summary*`,\n  `• *Incident ID:* \\`${safe(x.incidentId)}\\``,\n  `• *Service:* \\`${safe(x.service)}\\``,\n  `• *Environment:* \\`${safe(x.environment)}\\``,\n  `• *Severity:* *${safe(x.triage?.severity).toUpperCase()}*`,\n  `• *Confidence:* ${safe(x.triage?.confidence)}`,\n  ``,\n  `*Impact*`,\n  `${safe(x.triage?.businessImpact)}`,\n  ``,\n  `*Likely Root Cause*`,\n  `${safe(x.triage?.probableRootCause)}`,\n  ``,\n  `*Recommended Action*`,\n  `${safe(x.triage?.recommendedAction)}`,\n  ``,\n  `*Engineer Next Steps*`,\n  formatList(x.triage?.engineerNextSteps)\n].join(\"\\n\");\n\nconst jiraPayload = {\n  fields: {\n    project: { key: $vars.JIRA_PROJECT_KEY || \"OPS\" },\n    summary: x.triage.jiraSummary || `[${x.triage.severity}] ${x.title}`,\n    description: {\n      type: \"doc\",\n      version: 1,\n      content: [\n        {\n          type: \"paragraph\",\n          content: [{ type: \"text\", text: jiraText }]\n        }\n      ]\n    },\n    issuetype: { name: \"Task\" }\n  }\n};\n\nconst learningRecord = {\n  incidentId: x.incidentId,\n  service: x.service,\n  environment: x.environment,\n  severity: x.triage.severity,\n  recommendedAction: x.triage.recommendedAction,\n  probableRootCause: x.triage.probableRootCause,\n  confidence: x.triage.confidence,\n  runbooksUsed: (x.runbooks || []).map(r => r.title),\n  metrics: x.metrics,\n  timestamp: new Date().toISOString()\n};\n\nreturn [{ json: { ...x, slackText, jiraText, jiraPayload, learningRecord } }];\n"
+      },
+      "id": "974f9461-b146-4cad-b368-f4bac38ef9c7",
+      "name": "Prepare Slack Jira Learning Payloads",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1632,
+        1564
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{$json}}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "deec8c47-94de-404f-881c-7e6c180a16e0",
+      "name": "Respond - Triage Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        3440,
+        1564
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Prepare Slack Jira Learning Payloads').item.json.jiraText }}",
+        "options": {
+          "systemMessage": "You are a precise production operations copilot.\n\nBefore creating a Jira issue:\n1. First search for existing issues with similar summary and description using the search tool\n2. The search automatically excludes Done and Deployed issues - only active issues are checked\n3. Check if any returned issues are duplicates or very similar\n4. If a duplicate exists, respond with the existing issue key and do NOT create a new issue\n5. Only create a new issue if no similar active issue exists\n6. Ensure the exact summary from jiraPayload is used as the title for the jira ticket\n\nIMPORTANT: After your response, you MUST output the JSON object which you received and include \"jiraCreated\" field set to true if you created a new Jira issue, or false if you found a duplicate and did not create one."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1912,
+        1584
+      ],
+      "id": "b506533a-546e-487e-bcca-54627ae56894",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {
+          "textFormat": {
+            "textOptions": {
+              "type": "json_schema"
+            }
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1856,
+        1808
+      ],
+      "id": "071f121a-357c-4d61-9f77-e0dd70822c3e",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "Z9ghkeMBDTxE3rjj",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "project": {
+          "__rl": true,
+          "value": "10001",
+          "mode": "list",
+          "cachedResultName": "Bug Tracking"
+        },
+        "issueType": {
+          "__rl": true,
+          "value": "10007",
+          "mode": "list",
+          "cachedResultName": "Task"
+        },
+        "summary": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('summary', 'Issue title/summary') }}",
+        "additionalFields": {
+          "description": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('description', 'Detailed issue description') }}",
+          "priority": {
+            "__rl": true,
+            "value": "2",
+            "mode": "list",
+            "cachedResultName": "High"
+          },
+          "reporter": {
+            "__rl": true,
+            "value": "5f5d2d31c9c528007cd01cc5",
+            "mode": "list",
+            "cachedResultName": "olatunjioye7"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.jiraTool",
+      "typeVersion": 1,
+      "position": [
+        2016,
+        1808
+      ],
+      "id": "854b13b4-b7eb-42b9-8763-a454dee8ad4f",
+      "name": "Create an issue in Jira Software",
+      "credentials": {
+        "jiraSoftwareCloudApi": {
+          "id": "CBpO8T7RhZnZRXWS",
+          "name": "Jira SW Cloud account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0B669Z0EHH",
+          "mode": "list",
+          "cachedResultName": "prod-alerts"
+        },
+        "text": "={{ $json.slackText }}",
+        "otherOptions": {
+          "botProfile": {
+            "imageValues": {
+              "profilePhotoType": "emoji",
+              "icon_emoji": "ProdAlerts :rotating_light:"
+            }
+          },
+          "link_names": true
+        }
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1976,
+        1984
+      ],
+      "id": "2ec3e415-70ee-4550-bb76-f3c099e62413",
+      "name": "Send a message",
+      "webhookId": "cc43ee72-b5ed-441c-a1a2-c8e7d22830e9",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "8yXPPDKKNr0dxwfQ",
+          "name": "Slack OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "limit": 10,
+        "options": {
+          "fields": "summary,description,status,created",
+          "jql": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('JQL', `JQL query to search for similar issues. Use text search on summary and description fields to find duplicates. MUST exclude Done and Deployed statuses. Example: text ~ \"error payment\" AND project = KAN AND status NOT IN (Done, Deployed)`, 'string') }}"
+        }
+      },
+      "id": "a999e353-8a93-4440-a7de-ffe2108fffdc",
+      "name": "Search for issues in Jira Software",
+      "type": "n8n-nodes-base.jiraTool",
+      "typeVersion": 1,
+      "position": [
+        2176,
+        1808
+      ],
+      "credentials": {
+        "jiraSoftwareCloudApi": {
+          "id": "CBpO8T7RhZnZRXWS",
+          "name": "Jira SW Cloud account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "n8nopsprompts",
+          "mode": "list",
+          "cachedResultName": "n8nopsprompts"
+        },
+        "options": {
+          "clearNamespace": false,
+          "pineconeNamespace": "ai-agent-prompts"
+        }
+      },
+      "id": "df708058-1b5f-42f0-93ab-dc390ed41823",
+      "name": "Store Prompt in Pinecone",
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.3,
+      "position": [
+        1912,
+        1088
+      ],
+      "credentials": {
+        "pineconeApi": {
+          "id": "JNW9Tj8i3yh9r0Su",
+          "name": "Pinecone account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {
+          "dimensions": 1024
+        }
+      },
+      "id": "07850af4-db60-4548-a2ad-175f6e204f27",
+      "name": "OpenAI Embeddings",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1920,
+        1312
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "Z9ghkeMBDTxE3rjj",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ JSON.stringify({ prompt: $json.jiraText, incidentId: $json.incidentId, service: $json.service, severity: $json.triage.severity, timestamp: $now.toISO() }) }}",
+        "options": {}
+      },
+      "id": "e34bf936-96e1-45fb-86be-7c12acebf0e0",
+      "name": "Prompt Document Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        2112,
+        1312
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst item = $json;\nconst learningRecord = item.learningRecord;\n\nconst pageTitle = `Incident Learning - ${item.incidentId} - ${new Date().toISOString().split('T')[0]}`;\n\nconst pageContent = {\n  type: \"doc\",\n  version: 1,\n  content: [\n    {\n      type: \"heading\",\n      attrs: { level: 1 },\n      content: [{ type: \"text\", text: `Incident Learning: ${item.incidentId}` }]\n    },\n    {\n      type: \"paragraph\",\n      content: [{ type: \"text\", text: `Timestamp: ${learningRecord.timestamp}` }]\n    },\n    {\n      type: \"heading\",\n      attrs: { level: 2 },\n      content: [{ type: \"text\", text: \"Service Details\" }]\n    },\n    {\n      type: \"bulletList\",\n      content: [\n        {\n          type: \"listItem\",\n          content: [{\n            type: \"paragraph\",\n            content: [{ type: \"text\", text: `Service: ${learningRecord.service}` }]\n          }]\n        },\n        {\n          type: \"listItem\",\n          content: [{\n            type: \"paragraph\",\n            content: [{ type: \"text\", text: `Environment: ${learningRecord.environment}` }]\n          }]\n        },\n        {\n          type: \"listItem\",\n          content: [{\n            type: \"paragraph\",\n            content: [{ type: \"text\", text: `Severity: ${learningRecord.severity}` }]\n          }]\n        }\n      ]\n    },\n    {\n      type: \"heading\",\n      attrs: { level: 2 },\n      content: [{ type: \"text\", text: \"Analysis\" }]\n    },\n    {\n      type: \"bulletList\",\n      content: [\n        {\n          type: \"listItem\",\n          content: [{\n            type: \"paragraph\",\n            content: [{ type: \"text\", text: `Recommended Action: ${learningRecord.recommendedAction}` }]\n          }]\n        },\n        {\n          type: \"listItem\",\n          content: [{\n            type: \"paragraph\",\n            content: [{ type: \"text\", text: `Probable Root Cause: ${learningRecord.probableRootCause}` }]\n          }]\n        },\n        {\n          type: \"listItem\",\n          content: [{\n            type: \"paragraph\",\n            content: [{ type: \"text\", text: `Confidence: ${learningRecord.confidence}` }]\n          }]\n        }\n      ]\n    },\n    {\n      type: \"heading\",\n      attrs: { level: 2 },\n      content: [{ type: \"text\", text: \"Metrics\" }]\n    },\n    {\n      type: \"codeBlock\",\n      attrs: { language: \"json\" },\n      content: [{ type: \"text\", text: JSON.stringify(learningRecord.metrics, null, 2) }]\n    },\n    {\n      type: \"heading\",\n      attrs: { level: 2 },\n      content: [{ type: \"text\", text: \"Runbooks Used\" }]\n    },\n    {\n      type: \"bulletList\",\n      content: (learningRecord.runbooksUsed || []).map(runbook => ({\n        type: \"listItem\",\n        content: [{\n          type: \"paragraph\",\n          content: [{ type: \"text\", text: runbook }]\n        }]\n      }))\n    }\n  ]\n};\n\nreturn [{\n  json: {\n    ...item,\n    confluencePageTitle: pageTitle,\n    confluencePageContent: pageContent\n  }\n}];\n"
+      },
+      "id": "44da48aa-b69d-4a45-9b53-49734accb708",
+      "name": "Prepare Confluence Page Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2992,
+        1492
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.JIRA_BASE_URL }}/wiki/api/v2/pages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "jiraSoftwareCloudApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"spaceId\": {{ $vars.CONFLUENCE_SPACE_ID }},\n  \"status\": \"current\",\n  \"title\": {{ JSON.stringify($json.confluencePageTitle) }},\n  \"body\": {\n    \"representation\": \"atlas_doc_format\",\n    \"value\": {{ JSON.stringify(JSON.stringify($json.confluencePageContent)) }}\n  }\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "8a301d39-073b-43eb-8401-1566a86163c4",
+      "name": "Store Incident Learning in Confluence",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3216,
+        1492
+      ],
+      "credentials": {
+        "jiraSoftwareCloudApi": {
+          "id": "CBpO8T7RhZnZRXWS",
+          "name": "Jira SW Cloud account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "jira-status-change",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "03be8134-3600-47b4-8673-aa22f9cc0898",
+      "name": "Webhook - Jira Status Change",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        288,
+        2304
+      ],
+      "webhookId": "b6bea144-3349-4895-837f-4e9402a94ebd"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst body = $json.body ?? $json;\nconst issue = body.issue ?? {};\nconst fields = issue.fields ?? {};\nconst status = fields.status?.name ?? '';\n\nconst isDoneOrDeployed = ['Done', 'Deployed'].includes(status);\n\nif (!isDoneOrDeployed) {\n  return [];\n}\n\nconst descriptionText = fields.description ?? '';\n\nreturn [{\n  json: {\n    issueKey: issue.key,\n    status: status,\n    summary: fields.summary ?? '',\n    description: descriptionText,\n    project: fields.project?.key ?? '',\n    timestamp: new Date().toISOString()\n  }\n}];\n"
+      },
+      "id": "1a5bd197-1013-4b52-90f9-bc52953f008e",
+      "name": "Parse Jira Webhook Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        512,
+        2304
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"success\": \"true\"\n}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "7e2eed55-43da-4c17-b98e-0fe3bc089c12",
+      "name": "Respond - Jira Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        736,
+        2400
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0B669Z0EHH",
+          "mode": "list",
+          "cachedResultName": "prod-alerts"
+        },
+        "text": "=✅ *Jira Task Resolved*\n\n*Issue:* {{ $json.issueKey }}\n*Summary:* {{ $json.summary }}\n*Status:* {{ $json.status }}\n*Project:* {{ $json.project }}\n*Timestamp:* {{ $json.timestamp }}",
+        "otherOptions": {
+          "botProfile": {
+            "imageValues": {
+              "profilePhotoType": "emoji",
+              "icon_emoji": "white_check_mark"
+            }
+          },
+          "link_names": true
+        }
+      },
+      "id": "9b0f044c-8b60-4d0b-b92f-ade5a617d7e5",
+      "name": "Notify Slack - Jira Resolved",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        736,
+        2208
+      ],
+      "webhookId": "a81e9e80-81dc-4b20-b898-c61e655d3b34",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "8yXPPDKKNr0dxwfQ",
+          "name": "Slack OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst items = $input.all();\n\nconst agentItem = items.find(item => item.json.output !== undefined);\nconst originalDataItem = items.find(item => item.json.slackText !== undefined);\n\nconst agentOutput = agentItem?.json.output || '';\nlet jiraCreated = false;\n\ntry {\n  const parsed = JSON.parse(agentOutput);\n  const message = parsed.message || '';\n  jiraCreated = message.toLowerCase().includes('created') && !message.toLowerCase().includes('duplicate');\n} catch (e) {\n  jiraCreated = agentOutput.toLowerCase().includes('created') && !agentOutput.toLowerCase().includes('duplicate');\n}\n\nconst originalData = originalDataItem?.json || {};\n\nreturn [{\n  json: {\n    ...originalData,\n    agentOutput,\n    jiraCreated\n  }\n}];\n"
+      },
+      "id": "0ad9c8f4-0616-44e6-8099-599cd9988a90",
+      "name": "Check Jira Created",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2544,
+        1564
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.jiraCreated }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "id": "1fa2662b-0e7a-45a7-bdaa-cdad07b2cbe2"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4ed491d9-e376-4701-85b4-ace854513d5e",
+      "name": "Route by Jira Creation",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2768,
+        1564
+      ]
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2320,
+        1564
+      ],
+      "id": "0d7eff32-7f7f-4d04-a91d-e93ad0c20e46",
+      "name": "Merge"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Alert Intake": {
+      "main": [
+        [
+          {
+            "node": "Normalize Alert Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Alert Payload": {
+      "main": [
+        [
+          {
+            "node": "Mock Enrichment - Metrics Logs Runbooks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock Enrichment - Metrics Logs Runbooks": {
+      "main": [
+        [
+          {
+            "node": "Build AI Triage Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build AI Triage Prompt": {
+      "main": [
+        [
+          {
+            "node": "OpenAI - Summarize Incident",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI - Summarize Incident": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Triage + Approval Links",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Triage + Approval Links": {
+      "main": [
+        [
+          {
+            "node": "Prepare Slack Jira Learning Payloads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Slack Jira Learning Payloads": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Store Prompt in Pinecone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create an issue in Jira Software": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search for issues in Jira Software": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Prompt in Pinecone": {
+      "main": [
+        []
+      ]
+    },
+    "OpenAI Embeddings": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Store Prompt in Pinecone",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompt Document Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Store Prompt in Pinecone",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Confluence Page Content": {
+      "main": [
+        [
+          {
+            "node": "Store Incident Learning in Confluence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Incident Learning in Confluence": {
+      "main": [
+        [
+          {
+            "node": "Respond - Triage Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Jira Status Change": {
+      "main": [
+        [
+          {
+            "node": "Parse Jira Webhook Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Jira Webhook Payload": {
+      "main": [
+        [
+          {
+            "node": "Notify Slack - Jira Resolved",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Respond - Jira Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Slack - Jira Resolved": {
+      "main": [
+        []
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        []
+      ]
+    },
+    "Check Jira Created": {
+      "main": [
+        [
+          {
+            "node": "Route by Jira Creation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Jira Creation": {
+      "main": [
+        [
+          {
+            "node": "Prepare Confluence Page Content",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond - Triage Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Check Jira Created",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "aOhrJ1gMZWKruqWX",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "32b00e51-25d4-4fc1-a160-0d6b8853dd56",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "70fea89d10d5a2d3a8d1b2f6d1653827bccb2e579f48fb803f8e3a19d35129f4"
+  },
+  "id": "u2TQwS9HGl0x8j9W",
+  "tags": []
+}

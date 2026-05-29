@@ -1,0 +1,100 @@
+{
+  "name": "AI Production Operations Copilot - Error Notification",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "e65c815b-1321-49df-8689-6c3cc49ccd20",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst err = $json;\nconst text = [\n  \"🔥 *n8n Workflow Error*\",\n  `Workflow: <${err.execution?.url ?? \"https://oyeolatunji.app.n8n.cloud\"}|${err.workflow?.name ?? \"unknown\"}>`,\n  `Execution: ${err.execution?.id ?? \"unknown\"}`,\n  `Node Name: ${err.execution.error.node?.name ?? \"unknown\"}`,\n  `Node Type: ${err.execution.error.node?.type ?? \"unknown\"}`,\n  `Error: ${err.execution.error?.message ?? JSON.stringify(err.execution.error)}`\n].join(\"\\n\");\nreturn [{ json: { text, raw: err } }];\n"
+      },
+      "id": "0d23a8d7-d232-416d-ba8e-3d8bb7d68fb2",
+      "name": "Format Error Notification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0B669Z0EHH",
+          "mode": "list",
+          "cachedResultName": "prod-alerts"
+        },
+        "text": "={{ $json.text }}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        464,
+        0
+      ],
+      "id": "d13d6d1c-e3d2-479b-8d5f-25430b2dc052",
+      "name": "Send a message",
+      "webhookId": "f66f25bc-0772-40b6-a741-e433efbbef9e",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "Ct6tiXr4YXoPZlRO",
+          "name": "Slack OAuth2 API"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Format Error Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Error Notification": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "d882a4cf-3282-41da-a1aa-cdb26b460036",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "70fea89d10d5a2d3a8d1b2f6d1653827bccb2e579f48fb803f8e3a19d35129f4"
+  },
+  "id": "aOhrJ1gMZWKruqWX",
+  "tags": []
+}
