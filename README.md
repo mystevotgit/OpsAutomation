@@ -1,4 +1,4 @@
-# AI Production Operations Copilot - n8n Import Pack
+# AI Production Operations Copilot (OpsAutomation) - n8n Import Pack
 
 This pack includes the full alert-handling flow, the error workflow, a scheduled error generator for demo, and the Jira automation rule used by the feedback loop.
 
@@ -10,6 +10,7 @@ Import the n8n workflows one by one, then import the Jira rule separately in Jir
 3. AI Production Operations Copilot - Error Notification.json
 4. AI Production Operations Copilot - Scheduled Alert Generator.json
 5. jira-automation-rule-019e7434-f5c7-7d87-9061-5d5ea978cb79-202605292002.json
+6. presentation-guide.html
 
 ## Workflows
 
@@ -117,3 +118,6 @@ POST to `/webhook-test/ops-copilot-alert` or `/webhook/ops-copilot-alert`:
 - Rollback and retry are simulated and do not call deployment APIs.
 - Incident learning uses workflow static data posted to confluence as knowledgebase. A real vector database can be used for imporvement.
 - The scheduled generator is a demo-only helper that posts sample incidents into the main triage flow.
+
+## Presentation deck
+Open `presentation-guide.html` in a browser while recording the demo. It provides a colorful horizontal slide deck for the project, a sample payload copy button, and direct presentation prompts for each part of the flow.

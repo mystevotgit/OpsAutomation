@@ -14,7 +14,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst err = $json;\nconst text = [\n  \"🔥 *n8n Workflow Error*\",\n  `Workflow: <${err.execution?.url ?? \"https://oyeolatunji.app.n8n.cloud\"}|${err.workflow?.name ?? \"unknown\"}>`,\n  `Execution: ${err.execution?.id ?? \"unknown\"}`,\n  `Node Name: ${err.execution.error.node?.name ?? \"unknown\"}`,\n  `Node Type: ${err.execution.error.node?.type ?? \"unknown\"}`,\n  `Error: ${err.execution.error?.message ?? JSON.stringify(err.execution.error)}`\n].join(\"\\n\");\nreturn [{ json: { text, raw: err } }];\n"
+        "jsCode": "\nconst err = $json;\nconst text = [\n  \"🔥 *n8n Workflow Error*\",\n  `Workflow: <${err.execution?.url ?? \"https://YOUR_N8N_DOMAIN\"}|${err.workflow?.name ?? \"unknown\"}>`,\n  `Execution: ${err.execution?.id ?? \"unknown\"}`,\n  `Node Name: ${err.execution.error.node?.name ?? \"unknown\"}`,\n  `Node Type: ${err.execution.error.node?.type ?? \"unknown\"}`,\n  `Error: ${err.execution.error?.message ?? JSON.stringify(err.execution.error)}`\n].join(\"\\n\");\nreturn [{ json: { text, raw: err } }];\n"
       },
       "id": "0d23a8d7-d232-416d-ba8e-3d8bb7d68fb2",
       "name": "Format Error Notification",

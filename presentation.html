@@ -1,0 +1,911 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Production Operations Copilot | Presentation Deck</title>
+  <style>
+    :root {
+      --bg: #07111f;
+      --bg-soft: #0e1d33;
+      --panel: rgba(8, 18, 34, 0.78);
+      --panel-strong: rgba(10, 20, 39, 0.94);
+      --text: #f7fbff;
+      --muted: #b7c7dd;
+      --accent: #4ef0c1;
+      --accent-2: #ffb84d;
+      --accent-3: #ff6fa8;
+      --accent-4: #7ea8ff;
+      --border: rgba(255, 255, 255, 0.14);
+      --shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+      --radius-xl: 30px;
+      --radius-lg: 22px;
+      --radius-md: 16px;
+      --radius-sm: 12px;
+      --max-width: 1480px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Avenir Next", "Trebuchet MS", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(78, 240, 193, 0.20), transparent 28%),
+        radial-gradient(circle at top right, rgba(255, 111, 168, 0.16), transparent 25%),
+        radial-gradient(circle at 85% 18%, rgba(126, 168, 255, 0.14), transparent 18%),
+        linear-gradient(160deg, #05101f 0%, #071828 50%, #091625 100%);
+      overflow: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,0.85), transparent 92%);
+      pointer-events: none;
+      opacity: 0.5;
+    }
+
+    .glow {
+      position: fixed;
+      inset: auto;
+      width: 480px;
+      height: 480px;
+      border-radius: 50%;
+      filter: blur(50px);
+      opacity: 0.18;
+      pointer-events: none;
+      z-index: 0;
+      animation: float 16s ease-in-out infinite;
+    }
+
+    .glow.one {
+      top: -120px;
+      left: -120px;
+      background: radial-gradient(circle, rgba(78, 240, 193, 0.9), rgba(78, 240, 193, 0));
+    }
+
+    .glow.two {
+      top: 140px;
+      right: -120px;
+      animation-delay: -5s;
+      background: radial-gradient(circle, rgba(255, 111, 168, 0.9), rgba(255, 111, 168, 0));
+    }
+
+    .glow.three {
+      bottom: -160px;
+      left: 30%;
+      animation-delay: -9s;
+      background: radial-gradient(circle, rgba(126, 168, 255, 0.9), rgba(126, 168, 255, 0));
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+      50% { transform: translate3d(0, 22px, 0) scale(1.05); }
+    }
+
+    .shell {
+      position: relative;
+      z-index: 1;
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 24px 22px 28px;
+      height: 100vh;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 18px;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 14px;
+      z-index: 20;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 18px;
+      padding: 14px 18px;
+      margin-bottom: 20px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: rgba(7, 16, 31, 0.66);
+      backdrop-filter: blur(18px);
+      box-shadow: var(--shadow);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 46px;
+      height: 46px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2), var(--accent-3));
+      box-shadow: 0 12px 30px rgba(255, 111, 168, 0.25);
+      display: grid;
+      place-items: center;
+      color: #05101f;
+      font-weight: 900;
+      letter-spacing: 0.05em;
+    }
+
+    .brand-copy {
+      min-width: 0;
+    }
+
+    .eyebrow {
+      margin: 0 0 4px;
+      color: #95e7ff;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      font-size: 0.72rem;
+      font-weight: 800;
+    }
+
+    .brand-copy h1 {
+      margin: 0;
+      font-size: clamp(1rem, 1.8vw, 1.22rem);
+      font-weight: 800;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .topbar-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    .chip,
+    .button,
+    .nav-dot {
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      text-decoration: none;
+      transition: transform 180ms ease, background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+    }
+
+    .chip,
+    .button {
+      border-radius: 999px;
+      padding: 10px 14px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .chip:hover,
+    .button:hover,
+    .nav-dot:hover {
+      transform: translateY(-1px);
+      border-color: rgba(255, 255, 255, 0.24);
+      background: rgba(255, 255, 255, 0.10);
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.16);
+    }
+
+    .chip.active {
+      background: linear-gradient(135deg, rgba(78, 240, 193, 0.22), rgba(255, 111, 168, 0.22));
+      border-color: rgba(255,255,255,0.22);
+    }
+
+    .hero {
+      display: none;
+    }
+
+    .card {
+      position: relative;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      background: var(--panel);
+      backdrop-filter: blur(18px);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .presenter-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 0 4px;
+    }
+
+    .presenter-bar h2 {
+      margin: 0;
+      font-size: clamp(1.9rem, 3vw, 3rem);
+      letter-spacing: -0.05em;
+      line-height: 1;
+    }
+
+    .presenter-bar p {
+      margin: 6px 0 0;
+      color: var(--muted);
+    }
+
+    .presenter-controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .deck-wrap {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 14px;
+      align-items: center;
+      min-height: 0;
+    }
+
+    .deck {
+      display: flex;
+      gap: 18px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scroll-snap-type: x mandatory;
+      scroll-behavior: smooth;
+      padding: 10px 2px 18px;
+      min-height: 0;
+      height: 100%;
+      scrollbar-width: none;
+    }
+
+    .deck::-webkit-scrollbar {
+      display: none;
+    }
+
+    .slide {
+      flex: 0 0 min(92vw, 1280px);
+      scroll-snap-align: center;
+      scroll-margin-inline: 24px;
+      min-height: calc(100vh - 210px);
+      display: grid;
+      grid-template-columns: minmax(0, 1.02fr) minmax(320px, 0.98fr);
+      gap: 18px;
+      align-items: stretch;
+      padding: 24px;
+      border-radius: 34px;
+      border: 1px solid rgba(255,255,255,0.10);
+      background:
+        radial-gradient(circle at top right, rgba(255, 183, 77, 0.12), transparent 26%),
+        radial-gradient(circle at bottom left, rgba(78, 240, 193, 0.12), transparent 26%),
+        rgba(8, 18, 34, 0.82);
+      backdrop-filter: blur(18px);
+      box-shadow: var(--shadow);
+    }
+
+    .slide.single {
+      grid-template-columns: 1fr;
+    }
+
+    .slide-copy,
+    .slide-side {
+      padding: 22px;
+      border-radius: 26px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.04);
+    }
+
+    .slide-copy h2 {
+      margin: 8px 0 16px;
+      font-size: clamp(2.4rem, 4vw, 5rem);
+      line-height: 0.95;
+      letter-spacing: -0.06em;
+    }
+
+    .slide-copy h2 span {
+      display: block;
+      background: linear-gradient(90deg, #f7fbff 0%, #b7c7dd 32%, #79ffc9 55%, #ffcf6e 75%, #ff7bb5 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .slide-copy p,
+    .slide-side p,
+    .list li {
+      color: var(--muted);
+      line-height: 1.75;
+      font-size: 1rem;
+    }
+
+    .story-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .story-card {
+      padding: 16px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .story-card strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 1rem;
+    }
+
+    .story-card span {
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.55;
+    }
+
+    .slide-side {
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
+    .stack {
+      display: grid;
+      gap: 14px;
+    }
+
+    .stack-item {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .stack-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      color: #05101f;
+      background: linear-gradient(135deg, var(--accent), var(--accent-4));
+    }
+
+    .stack-item strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .stack-item span {
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 0.95rem;
+    }
+
+    .hero {
+      display: none;
+    }
+
+    .section-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      color: #d7e8ff;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      font-size: 0.72rem;
+      font-weight: 900;
+    }
+
+    .section-label::before {
+      content: "";
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      box-shadow: 0 0 0 6px rgba(78, 240, 193, 0.12);
+    }
+
+    .navdots {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .nav-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      padding: 0;
+      display: inline-block;
+      position: relative;
+    }
+
+    .nav-dot.active {
+      background: linear-gradient(135deg, var(--accent), var(--accent-3));
+      box-shadow: 0 0 0 6px rgba(255,255,255,0.05);
+    }
+
+    .nav-dot::after {
+      content: attr(data-label);
+      position: absolute;
+      left: 50%;
+      top: -34px;
+      transform: translateX(-50%);
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: rgba(6, 15, 28, 0.95);
+      border: 1px solid rgba(255,255,255,0.10);
+      color: var(--text);
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 160ms ease, transform 160ms ease;
+      font-size: 0.8rem;
+    }
+
+    .nav-dot:hover::after {
+      opacity: 1;
+      transform: translateY(-50%) translateX(-4px);
+    }
+
+    .footer-note {
+      margin: 0;
+      padding: 12px 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.04);
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 0.95rem;
+    }
+
+    .footer-note strong {
+      color: var(--text);
+    }
+
+    .highlight {
+      color: #fff;
+      background: linear-gradient(90deg, rgba(78,240,193,0.16), rgba(255,183,77,0.18));
+      padding: 0 6px;
+      border-radius: 6px;
+    }
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(18px);
+      animation: reveal 900ms ease forwards;
+    }
+
+    .delay-1 { animation-delay: 120ms; }
+    .delay-2 { animation-delay: 220ms; }
+    .delay-3 { animation-delay: 320ms; }
+    .delay-4 { animation-delay: 420ms; }
+
+    @keyframes reveal {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 1080px) {
+      .shell {
+        height: auto;
+        min-height: 100vh;
+      }
+
+      body {
+        overflow: auto;
+      }
+
+      .deck-wrap {
+        grid-template-columns: 1fr;
+      }
+
+      .navdots {
+        display: none;
+      }
+
+      .presenter-bar {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .presenter-controls {
+        justify-content: flex-start;
+      }
+
+      .slide {
+        flex-basis: min(92vw, 1000px);
+        grid-template-columns: 1fr;
+        min-height: auto;
+      }
+
+      .story-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .shell {
+        padding-inline: 14px;
+      }
+
+      .topbar {
+        position: static;
+        flex-direction: column;
+        align-items: stretch;
+        border-radius: 24px;
+      }
+
+      .topbar-actions {
+        justify-content: flex-start;
+      }
+
+      .deck {
+        padding-bottom: 12px;
+      }
+
+      .slide {
+        padding: 18px;
+        flex-basis: 92vw;
+      }
+
+      .slide-copy,
+      .slide-side {
+        padding: 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="glow one"></div>
+  <div class="glow two"></div>
+  <div class="glow three"></div>
+
+  <main class="shell">
+    <header class="topbar reveal">
+      <div class="brand">
+        <div class="brand-mark">AO</div>
+        <div class="brand-copy">
+          <p class="eyebrow">Presentation deck</p>
+          <h1>AI Production Operations Copilot</h1>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <a class="chip" href="#slide-1">Slide 1</a>
+        <a class="chip" href="#slide-2">Slide 2</a>
+        <a class="chip" href="#slide-3">Slide 3</a>
+        <a class="chip" href="#slide-4">Slide 4</a>
+        <button class="chip" id="copyPayloadTop" type="button">Copy sample payload</button>
+      </div>
+    </header>
+
+    <div class="presenter-bar reveal delay-1">
+      <div>
+        <p class="eyebrow">Project presentation</p>
+        <h2>AI Production Operations Copilot</h2>
+      </div>
+      <div class="presenter-controls">
+        <button class="chip" id="prevSlide" type="button">Previous</button>
+        <button class="chip" id="nextSlide" type="button">Next</button>
+      </div>
+    </div>
+
+    <div class="deck-wrap">
+      <button class="chip" id="arrowLeft" type="button" aria-label="Previous slide">←</button>
+
+      <section class="deck" id="deck" aria-label="Presentation slides">
+        <article class="slide reveal delay-1" id="slide-1">
+          <div class="slide-copy">
+            <p class="section-label">Slide 1</p>
+            <h2><span>Production incidents deserve a guided response.</span></h2>
+            <p>
+              Alerts are noisy, handoffs are slow, and important context is split across systems.
+              This project shows how an AI-assisted operations copilot can turn that chaos into a clear response path.
+            </p>
+            <div class="story-grid">
+              <div class="story-card">
+                <strong>Signal in</strong>
+                <span>A production alert enters the main webhook with the incident context attached.</span>
+              </div>
+              <div class="story-card">
+                <strong>Decision out</strong>
+                <span>The workflow suggests the next move, including retry or rollback when needed.</span>
+              </div>
+              <div class="story-card">
+                <strong>Loop back</strong>
+                <span>Jira and the callback flow keep the response connected after the first action.</span>
+              </div>
+            </div>
+          </div>
+          <aside class="slide-side">
+            <p class="section-label">Core flow</p>
+            <div class="stack">
+              <div class="stack-item">
+                <div class="stack-icon">1</div>
+                <div>
+                  <strong>Alert intake</strong>
+                  <span>The workflow receives the incident payload through a webhook.</span>
+                </div>
+              </div>
+              <div class="stack-item">
+                <div class="stack-icon">2</div>
+                <div>
+                  <strong>AI triage</strong>
+                  <span>OpenAI evaluates the incident and recommends the next step.</span>
+                </div>
+              </div>
+              <div class="stack-item">
+                <div class="stack-icon">3</div>
+                <div>
+                  <strong>Approval loop</strong>
+                  <span>Human approval is used when rollback or retry is recommended.</span>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </article>
+
+        <article class="slide reveal delay-2" id="slide-2">
+          <div class="slide-copy">
+            <p class="section-label">Slide 2</p>
+            <h2><span>The import pack is the whole demo.</span></h2>
+            <p>
+              This folder contains everything needed for the recording: the alert triage workflow, approval handler, error workflow,
+              scheduled alert generator, and the Jira automation rule that closes the loop.
+            </p>
+            <div class="story-grid">
+              <div class="story-card">
+                <strong>Alert Triage</strong>
+                <span>Main intake, enrichment, Jira handling, Slack notification, and learning capture.</span>
+              </div>
+              <div class="story-card">
+                <strong>Approval Handler</strong>
+                <span>Receives human decisions and simulates rollback or retry for the demo.</span>
+              </div>
+              <div class="story-card">
+                <strong>Error Workflow</strong>
+                <span>Captures failures and keeps the presentation honest and observable.</span>
+              </div>
+            </div>
+          </div>
+          <aside class="slide-side">
+            <p class="section-label">Supporting services</p>
+            <div class="stack">
+              <div class="stack-item">
+                <div class="stack-icon">A</div>
+                <div>
+                  <strong>Slack</strong>
+                  <span>Operational updates are pushed to the team channel.</span>
+                </div>
+              </div>
+              <div class="stack-item">
+                <div class="stack-icon">B</div>
+                <div>
+                  <strong>Jira</strong>
+                  <span>Issues are created or matched for incident tracking.</span>
+                </div>
+              </div>
+              <div class="stack-item">
+                <div class="stack-icon">C</div>
+                <div>
+                  <strong>Confluence</strong>
+                  <span>Incident learning is written into documentation for later reuse.</span>
+                </div>
+              </div>
+              <div class="stack-item">
+                <div class="stack-icon">D</div>
+                <div>
+                  <strong>Pinecone</strong>
+                  <span>Vector database used for storing embeddings and similarity search of incident learnings.</span>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </article>
+
+        <article class="slide reveal delay-3" id="slide-3">
+          <div class="slide-copy">
+            <p class="section-label">Slide 3</p>
+            <h2><span>Walk through the live incident flow.</span></h2>
+            <p>
+              Start with a sample alert, then move through triage, issue creation, Slack visibility, and the approval branch.
+              The audience should always know where the incident is in the flow.
+            </p>
+            <div class="story-grid">
+              <div class="story-card">
+                <strong>Webhook intake</strong>
+                <span>The alert arrives on the main webhook with the incident payload.</span>
+              </div>
+              <div class="story-card">
+                <strong>AI guidance</strong>
+                <span>OpenAI helps decide severity, context, and the right next step.</span>
+              </div>
+              <div class="story-card">
+                <strong>Human approval</strong>
+                <span>Rollbacks and retries stay under human control when they matter most.</span>
+              </div>
+            </div>
+          </div>
+          <aside class="slide-side">
+            <p class="section-label">Demo payload</p>
+            <div class="codebox" aria-label="Sample payload">
+              <div class="codebox-header">
+                <span>Demo alert payload</span>
+                <button class="copy-btn" id="copyPayload" type="button">Copy JSON</button>
+              </div>
+              <pre id="payloadBlock">{
+  "incidentId": "inc-demo-001",
+  "source": "grafana",
+  "title": "High latency and error rate on booking-transformer",
+  "service": "booking-transformer",
+  "environment": "prod",
+  "severity": "critical",
+  "description": "P95 latency and 5xx rate exceeded threshold after recent deployment",
+  "metrics": {
+    "p95LatencyMs": 2400,
+    "p99LatencyMs": 5100,
+    "errorRatePercent": 12.5,
+    "throughputRps": 460,
+    "saturationPercent": 91
+  },
+  "approvalBaseUrl": "https://YOUR_N8N_DOMAIN/webhook/ops-copilot-approval"
+}</pre>
+            </div>
+          </aside>
+        </article>
+
+        <article class="slide reveal delay-4" id="slide-4">
+          <div class="slide-copy">
+            <p class="section-label">Slide 4</p>
+            <h2><span>Finish with the outcome and loop.</span></h2>
+            <p>
+              End on the business result: faster triage, clearer escalation, and a feedback loop that keeps incident handling learning
+              over time. That is the story the audience should remember.
+            </p>
+            <div class="story-grid">
+              <div class="story-card">
+                <strong>Operational speed</strong>
+                <span>Less swivel-chair work, faster context gathering, and clearer next actions.</span>
+              </div>
+              <div class="story-card">
+                <strong>Feedback loop</strong>
+                <span>Jira status updates feed back into the demo so the loop feels complete.</span>
+              </div>
+              <div class="story-card">
+                <strong>Demo-ready</strong>
+                <span>Everything is self-contained and easy to replay on camera.</span>
+              </div>
+            </div>
+          </div>
+          <aside class="slide-side">
+            <p class="section-label">Closed loop</p>
+            <div class="stack">
+              <div class="stack-item">
+                <div class="stack-icon">✓</div>
+                <div>
+                  <strong>Incident response</strong>
+                  <span>The workflow turns raw alerts into structured operational action.</span>
+                </div>
+              </div>
+              <div class="stack-item">
+                <div class="stack-icon">↔</div>
+                <div>
+                  <strong>Feedback loop</strong>
+                  <span>Jira transitions flow back into the automation path.</span>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </article>
+      </section>
+
+      <button class="chip" id="arrowRight" type="button" aria-label="Next slide">→</button>
+    </div>
+
+  </main>
+
+  <script>
+    const deck = document.getElementById('deck');
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    const payload = document.getElementById('payloadBlock').innerText.trim();
+    const copyButtons = [document.getElementById('copyPayloadTop'), document.getElementById('copyPayload')];
+    const navLinks = ['slide-1', 'slide-2', 'slide-3', 'slide-4'].map((id) => document.querySelector(`a[href="#${id}"]`)).filter(Boolean);
+    const prevButtons = [document.getElementById('prevSlide'), document.getElementById('arrowLeft')];
+    const nextButtons = [document.getElementById('nextSlide'), document.getElementById('arrowRight')];
+
+    async function copyPayload() {
+      try {
+        await navigator.clipboard.writeText(payload);
+        copyButtons.forEach((button) => {
+          const label = button.textContent;
+          button.textContent = 'Copied';
+          setTimeout(() => {
+            button.textContent = label;
+          }, 1200);
+        });
+      } catch (error) {
+        alert('Copy failed. You can select the JSON block manually.');
+      }
+    }
+
+    copyButtons.forEach((button) => button.addEventListener('click', copyPayload));
+
+    function scrollToSlide(index) {
+      const slide = slides[Math.max(0, Math.min(slides.length - 1, index))];
+      slide.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
+
+    function getActiveSlideIndex() {
+      const deckCenter = deck.getBoundingClientRect().left + deck.clientWidth / 2;
+      let activeIndex = 0;
+      let bestDistance = Infinity;
+
+      slides.forEach((slide, index) => {
+        const rect = slide.getBoundingClientRect();
+        const slideCenter = rect.left + rect.width / 2;
+        const distance = Math.abs(slideCenter - deckCenter);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          activeIndex = index;
+        }
+      });
+
+      return activeIndex;
+    }
+
+    function updateNav() {
+      const activeIndex = getActiveSlideIndex();
+      navLinks.forEach((link, index) => link.classList.toggle('active', index === activeIndex));
+    }
+
+    deck.addEventListener('scroll', () => {
+      window.requestAnimationFrame(updateNav);
+    });
+
+    navLinks.forEach((link, index) => {
+      link.addEventListener('click', (event) => {
+        event.preventDefault();
+        scrollToSlide(index);
+      });
+    });
+
+    prevButtons.forEach((button) => button.addEventListener('click', () => scrollToSlide(getActiveSlideIndex() - 1)));
+    nextButtons.forEach((button) => button.addEventListener('click', () => scrollToSlide(getActiveSlideIndex() + 1)));
+
+    window.addEventListener('keydown', (event) => {
+      const key = event.key.toLowerCase();
+      if (!['arrowleft', 'arrowright', 'pageup', 'pagedown'].includes(key)) {
+        return;
+      }
+
+      const currentIndex = getActiveSlideIndex();
+      const nextIndex = key === 'arrowright' || key === 'pagedown'
+        ? Math.min(slides.length - 1, currentIndex + 1)
+        : Math.max(0, currentIndex - 1);
+
+      scrollToSlide(nextIndex);
+    });
+
+    updateNav();
+  </script>
+</body>
+</html>
